@@ -200,21 +200,30 @@ public class MainActivity extends BaseActivity {
                                             Logger.i(LOG_TAG, "onPictureTaken");
                                             Logger.d(LOG_TAG, "onPictureTaken data.length : " + data.length);
                                             Bitmap srcBitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-                                            Bitmap dstBitmap = Bitmap.createScaledBitmap(srcBitmap,
-                                                    (int) (160 * mDisplayMetrics.density), (int) (90 * mDisplayMetrics.density), false);
                                             int srcBitmapWidth = srcBitmap.getWidth();
                                             int srcBitmapHeight = srcBitmap.getHeight();
                                             int cutBorderWidth = mCutBorderView.getWidth();
                                             int cutBorderHeight = mCutBorderView.getHeight();
                                             float scaledWidth = srcBitmapWidth / (float) mDisplayMetrics.widthPixels;
                                             float scaledHeight = srcBitmapHeight / (float) mDisplayMetrics.heightPixels;
+                                            int dstCutWidth = (int) (cutBorderWidth * scaledWidth);
+                                            int dstCutHeight = (int) (cutBorderHeight * scaledHeight);
+                                            int dstStartX = (srcBitmapWidth - dstCutWidth) / 2;
+                                            int dstStartY = (srcBitmapHeight - dstCutHeight) / 2;
+                                            Bitmap dstBitmap = Bitmap.createScaledBitmap(srcBitmap,
+                                                    (int) (160 * mDisplayMetrics.density), (int) (90 * mDisplayMetrics.density), false);
+                                            Bitmap croppedBitmap = Bitmap.createBitmap(srcBitmap, dstStartX, dstStartY, dstCutWidth, dstCutHeight);
                                             Logger.d(LOG_TAG, "onPictureTaken srcBitmapWidth : " + srcBitmapWidth);
                                             Logger.d(LOG_TAG, "onPictureTaken srcBitmapHeight : " + srcBitmapHeight);
                                             Logger.d(LOG_TAG, "onPictureTaken cutBorderWidth : " + cutBorderWidth);
                                             Logger.d(LOG_TAG, "onPictureTaken cutBorderHeight : " + cutBorderHeight);
                                             Logger.d(LOG_TAG, "onPictureTaken scaledWidth : " + scaledWidth);
                                             Logger.d(LOG_TAG, "onPictureTaken scaledHeight : " + scaledHeight);
-                                            mPreviewImageView.setImageBitmap(dstBitmap);
+                                            Logger.d(LOG_TAG, "onPictureTaken dstCutWidth : " + dstCutWidth);
+                                            Logger.d(LOG_TAG, "onPictureTaken dstCutHeight : " + dstCutHeight);
+                                            Logger.d(LOG_TAG, "onPictureTaken dstStartX : " + dstStartX);
+                                            Logger.d(LOG_TAG, "onPictureTaken dstStartY : " + dstStartY);
+                                            mPreviewImageView.setImageBitmap(croppedBitmap);
                                             mCamera.startPreview();
                                         }
                                     });
