@@ -6,6 +6,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.Camera;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -20,7 +21,12 @@ import com.xiaozi.android.camera.BuildConfig;
 import com.xiaozi.android.camera.R;
 import com.xiaozi.android.camera.utils.Logger;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 
 public class MainActivity extends BaseActivity {
     private SurfaceView mSurfaceView = null;
@@ -32,6 +38,7 @@ public class MainActivity extends BaseActivity {
     private SurfaceHolder mSurfaceHolder = null;
 
     private final static int REQUEST_PERMISSIONS_CODE = 1001;
+    private final static String PICTURE_SAVE_FOLDER_PATH = String.format("%s/%s", Environment.getExternalStorageDirectory().getAbsolutePath(), BuildConfig.APPLICATION_ID);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +80,7 @@ public class MainActivity extends BaseActivity {
                 Logger.d(LOG_TAG, "onRequestPermissionsResult grantedCount : " + grantedCount);
 
                 if (grantedCount == grantResults.length) {
+                    checkFolderExists();
                     initCamera();
                 } else {
 
@@ -142,8 +150,16 @@ public class MainActivity extends BaseActivity {
         }
 
         if ((hasWriteExternalStoragePermission & hasCameraPermission) == PackageManager.PERMISSION_GRANTED) {
+            checkFolderExists();
             initCamera();
         }
+    }
+
+    private void checkFolderExists() {
+        Logger.i(LOG_TAG, "checkFolderExists");
+        Logger.d(LOG_TAG, "checkFolderExists PICTURE_SAVE_FOLDER_PATH : " + PICTURE_SAVE_FOLDER_PATH);
+        File folder = new File(PICTURE_SAVE_FOLDER_PATH);
+        if (!folder.exists()) folder.mkdir();
     }
 
     private void initCamera() {
@@ -154,32 +170,46 @@ public class MainActivity extends BaseActivity {
                 Camera.Parameters parameters = mCamera.getParameters();
                 parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);
                 mCamera.setParameters(parameters);
-//                mCamera.setOneShotPreviewCallback(new Camera.PreviewCallback() {
-//                    @Override
-//                    public void onPreviewFrame(byte[] data, Camera camera) {
-//                        Logger.i(LOG_TAG, "initCamera onPreviewFrame");
-//                    }
-//                });
-//                mCamera.setAutoFocusMoveCallback(new Camera.AutoFocusMoveCallback() {
-//                    @Override
-//                    public void onAutoFocusMoving(boolean start, Camera camera) {
-//                        Logger.i(LOG_TAG, "initCamera onAutoFocusMoving");
-//                    }
-//                });
-//                mCamera.autoFocus(new Camera.AutoFocusCallback() {
-//                    @Override
-//                    public void onAutoFocus(boolean success, Camera camera) {
-//                        Logger.i(LOG_TAG, "initCamera onAutoFocus");
-//                    }
-//                });
-                mCamera.setPreviewDisplay(mSurfaceHolder);
-                mCamera.startPreview();
             } catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+                try {
+                    mCamera.setPreviewDisplay(mSurfaceHolder);
+                    mCamera.startPreview();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         } else {
             Toast.makeText(mActivity, "No Camera.", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private synchronized void savePicture(final Bitmap bitmap) {
+        Logger.i(LOG_TAG, "savePicture");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+                String filePath = String.format("%s/%s.png", PICTURE_SAVE_FOLDER_PATH, sdf.format(System.currentTimeMillis()));
+                FileOutputStream fos = null;
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+                try {
+                    fos = new FileOutputStream(new File(filePath));
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 80, fos);
+                    fos.flush();
+                    fos.close();
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } finally {
+                    bitmap.recycle();
+                    System.gc();
+                }
+            }
+        }).start();
     }
 
     private View.OnClickListener onClickListener = new View.OnClickListener() {
@@ -197,8 +227,8 @@ public class MainActivity extends BaseActivity {
                                     mCamera.takePicture(null, null, new Camera.PictureCallback() {
                                         @Override
                                         public void onPictureTaken(byte[] data, Camera camera) {
-                                            Logger.i(LOG_TAG, "onPictureTaken");
-                                            Logger.d(LOG_TAG, "onPictureTaken data.length : " + data.length);
+                                            Logger.i(LOG_TAG, "onPictureTakenB");
+                                            Logger.d(LOG_TAG, "onPictureTakenB data.length : " + data.length);
                                             Bitmap srcBitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
                                             int srcBitmapWidth = srcBitmap.getWidth();
                                             int srcBitmapHeight = srcBitmap.getHeight();
@@ -210,8 +240,8 @@ public class MainActivity extends BaseActivity {
                                             int dstCutHeight = (int) (cutBorderHeight * scaledHeight);
                                             int dstStartX = (srcBitmapWidth - dstCutWidth) / 2;
                                             int dstStartY = (srcBitmapHeight - dstCutHeight) / 2;
-                                            Bitmap dstBitmap = Bitmap.createScaledBitmap(srcBitmap,
-                                                    (int) (160 * mDisplayMetrics.density), (int) (90 * mDisplayMetrics.density), false);
+//                                            Bitmap dstBitmap = Bitmap.createScaledBitmap(srcBitmap,
+//                                                    (int) (160 * mDisplayMetrics.density), (int) (90 * mDisplayMetrics.density), false);
                                             Bitmap croppedBitmap = Bitmap.createBitmap(srcBitmap, dstStartX, dstStartY, dstCutWidth, dstCutHeight);
                                             Logger.d(LOG_TAG, "onPictureTaken srcBitmapWidth : " + srcBitmapWidth);
                                             Logger.d(LOG_TAG, "onPictureTaken srcBitmapHeight : " + srcBitmapHeight);
@@ -223,8 +253,9 @@ public class MainActivity extends BaseActivity {
                                             Logger.d(LOG_TAG, "onPictureTaken dstCutHeight : " + dstCutHeight);
                                             Logger.d(LOG_TAG, "onPictureTaken dstStartX : " + dstStartX);
                                             Logger.d(LOG_TAG, "onPictureTaken dstStartY : " + dstStartY);
-                                            mPreviewImageView.setImageBitmap(croppedBitmap);
+//                                            mPreviewImageView.setImageBitmap(croppedBitmap);
                                             mCamera.startPreview();
+                                            savePicture(croppedBitmap);
                                         }
                                     });
                                 }
